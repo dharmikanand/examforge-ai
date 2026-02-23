@@ -1,0 +1,196 @@
+
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user of the ExamForge AI application, primarily for linking user-specific data like upload history and generated intelligence. This entity anticipates future features like user dashboards and saved history.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity. This ID would typically be provided by an external authentication system."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt"
+      ]
+    },
+    "UploadHistory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UploadHistory",
+      "type": "object",
+      "description": "Records details about each content input (text, image, or PDF) provided by a user for AI processing, forming the basis for 'upload history' in future phases.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UploadHistory entry."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile who initiated this content upload. (Relationship: UserProfile 1:N UploadHistory)"
+        },
+        "uploadTimestamp": {
+          "type": "string",
+          "description": "Timestamp indicating when the content was uploaded or provided by the user.",
+          "format": "date-time"
+        },
+        "inputType": {
+          "type": "string",
+          "description": "The type of content input provided by the user. Possible values: 'TEXT', 'IMAGE', 'PDF'."
+        },
+        "originalFileName": {
+          "type": "string",
+          "description": "The original name of the uploaded file (applicable for 'IMAGE' and 'PDF' inputs)."
+        },
+        "fileSizeBytes": {
+          "type": "number",
+          "description": "The size of the uploaded file in bytes (applicable for 'IMAGE' and 'PDF' inputs)."
+        },
+        "pdfPageCount": {
+          "type": "number",
+          "description": "The number of pages in the uploaded PDF document (applicable for 'PDF' inputs)."
+        },
+        "originalContentReference": {
+          "type": "string",
+          "description": "A URI or path referencing the stored raw input content (e.g., an S3 URL or a local file path). This is essential for future persistence of original files.",
+          "format": "uri"
+        },
+        "extractedTextContent": {
+          "type": "string",
+          "description": "The complete textual content extracted from the original input (via OCR for images/PDFs or direct text input), which is then fed to the AI model."
+        },
+        "processingStatus": {
+          "type": "string",
+          "description": "The current status of the content processing workflow. Possible values: 'PENDING', 'EXTRACTING_TEXT', 'PROCESSING_AI', 'COMPLETED', 'FAILED'."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "uploadTimestamp",
+        "inputType",
+        "extractedTextContent",
+        "processingStatus"
+      ]
+    },
+    "IntelligenceGeneration": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "IntelligenceGeneration",
+      "type": "object",
+      "description": "Stores the results of an AI intelligence generation request, linking back to the specific uploaded content and chosen intelligence mode.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the IntelligenceGeneration result entry."
+        },
+        "uploadHistoryId": {
+          "type": "string",
+          "description": "Reference to the UploadHistory entry that this AI generation is based on. (Relationship: UploadHistory 1:N IntelligenceGeneration)"
+        },
+        "intelligenceMode": {
+          "type": "string",
+          "description": "The specific AI intelligence mode selected by the user for this generation. Possible values: 'SURVIVAL', 'WEAPONIZER', 'TRAP_DETECTOR', 'MCQ_GENERATOR'."
+        },
+        "generationTimestamp": {
+          "type": "string",
+          "description": "Timestamp indicating when the AI intelligence output was generated.",
+          "format": "date-time"
+        },
+        "outputContent": {
+          "type": "string",
+          "description": "The complete structured AI-generated output, typically stored as a JSON string that represents the content for the dynamic UI cards."
+        },
+        "durationSeconds": {
+          "type": "number",
+          "description": "The total time taken in seconds for the AI model to process the content and generate the output."
+        }
+      },
+      "required": [
+        "id",
+        "uploadHistoryId",
+        "intelligenceMode",
+        "generationTimestamp",
+        "outputContent"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous",
+      "google"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores individual user profiles. The document ID (`userId`) is directly linked to the Firebase Authentication UID, making it the root for all user-specific data. Authorization rules can directly check `request.auth.uid == userId`.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for a user, corresponding to `request.auth.uid`."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/uploadHistory/{uploadHistoryId}",
+        "definition": {
+          "entityName": "UploadHistory",
+          "schema": {
+            "$ref": "#/backend/entities/UploadHistory"
+          },
+          "description": "Records details about each content input (text, image, PDF) provided by a user. Each document includes `userId` for authorization independence, allowing direct `request.auth.uid == resource.data.userId` checks without parent document lookups. This collection is private to the owning user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user who owns this upload history entry."
+            },
+            {
+              "name": "uploadHistoryId",
+              "description": "The unique identifier for a specific content upload record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/uploadHistory/{uploadHistoryId}/intelligenceGenerations/{intelligenceGenerationId}",
+        "definition": {
+          "entityName": "IntelligenceGeneration",
+          "schema": {
+            "$ref": "#/backend/entities/IntelligenceGeneration"
+          },
+          "description": "Stores the results of an AI intelligence generation request. Each document *must* include the denormalized `userId` (from the grandparent user profile) and `uploadHistoryId` (from the parent upload history) to achieve authorization independence. This allows rules to verify ownership directly via `request.auth.uid == resource.data.userId` without `get()` operations on parent documents. This collection is private to the owning user and specific upload.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user who initiated this intelligence generation (denormalized from the user profile)."
+            },
+            {
+              "name": "uploadHistoryId",
+              "description": "The unique identifier for the specific upload history entry this intelligence generation is based on."
+            },
+            {
+              "name": "intelligenceGenerationId",
+              "description": "The unique identifier for a specific AI intelligence generation result."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure prioritizes strict user data isolation and clear, explicit authorization to ensure security, scalability, and debuggability."
+  }
+}

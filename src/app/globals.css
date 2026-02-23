@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 218 12% 85%; /* #D2D6DD - Light Gray */
+    --foreground: 220 40% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 40% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 40% 10%;
+    --primary: 220 40% 27%; /* #293B5F - Deep Blue */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 220 15% 90%;
+    --secondary-foreground: 220 40% 27%;
+    --muted: 220 10% 92%;
+    --muted-foreground: 220 10% 40%;
+    --accent: 32 100% 45%; /* #E87A00 - Bright Orange */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 13% 80%;
+    --input: 220 13% 80%;
+    --ring: 32 100% 45%;
+    --radius: 0.75rem;
+  }
+  .dark {
+    --background: 220 40% 10%;
+    --foreground: 0 0% 98%;
+    --card: 220 40% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 220 40% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 218 12% 85%;
+    --primary-foreground: 220 40% 10%;
+    --secondary: 220 40% 20%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 220 40% 15%;
+    --muted-foreground: 220 10% 65%;
+    --accent: 32 100% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 40% 20%;
+    --input: 220 40% 20%;
+    --ring: 32 100% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+}
+
+.intelligence-card-enter {
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

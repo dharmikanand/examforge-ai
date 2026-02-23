@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * CORE PHILOSOPHY
+     * This ruleset enforces a strict user-ownership model designed for the ExamForge AI application.
+     * Access control is predicated on the principle that users should only interact with data 
+     * they created. Security is maintained through path-based authorization and internal 
+     * field validation to ensure data integrity.
+     *
+     * DATA STRUCTURE
+     * The hierarchy is strictly organized under a root `/users/{userId}` path. 
+     * - /users/{userId} (UserProfile)
+     * -- /uploadHistory/{uploadHistoryId} (UploadHistory)
+     * --- /intelligenceGenerations/{intelligenceGenerationId} (IntelligenceGeneration)
+     * -- /studyMaterials/{materialId} (Study Session Records)
+     *
+     * KEY SECURITY DECISIONS
+     * 1. Strict Ownership: All read and write operations require the requester's UID to 
+     *    match the {userId} parameter in the path.
+     * 2. Denormalization for Authorization: Critical fields like `userId` and `uploadHistoryId` 
+     *    are denormalized into child documents. This allows rules to verify ownership and 
+     *    relational integrity locally on the document being accessed, avoiding expensive 
+     *    cross-document `get()` calls.
+     * 3. Prototyping Mode: While authorization is strictly enforced, the rules do not 
+     *    validate the specific schema (types/optional fields) of the application data 
+     *    to allow for rapid iteration.
+     * 4. Auditability: Destructive operations (update, delete) explicitly verify the 
+     *    existence of the document before proceeding.
+     */
+
+    // --- GLOBAL HELPER FUNCTIONS ---
+
+    /**
+     * @description Checks if the request is made by an authenticated user.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user is the owner and the document currently exists.
+     * Used for update and delete operations to ensure state-change robustness.
+     */
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    // --- COLLECTION RULES ---
+
+    /**
+     * @description Rules for UserProfile documents. Users can only manage their own profile.
+     * @path /users/{userId}
+     */
+    match /users/{userId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Rules for studyMaterials. Stores combined study sessions and AI results.
+       * @path /users/{userId}/studyMaterials/{materialId}
+       */
+      match /studyMaterials/{materialId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Rules for UploadHistory. Private records of a user's content uploads.
+       * @path /users/{userId}/uploadHistory/{uploadHistoryId}
+       */
+      match /uploadHistory/{uploadHistoryId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
+
+        /**
+         * @description Rules for IntelligenceGeneration. AI results tied to a specific upload.
+         * @path /users/{userId}/uploadHistory/{uploadHistoryId}/intelligenceGenerations/{intelligenceGenerationId}
+         */
+        match /intelligenceGenerations/{intelligenceGenerationId} {
+          allow get, list: if isOwner(userId);
+          allow create: if isOwner(userId) && request.resource.data.userId == userId && request.resource.data.uploadHistoryId == uploadHistoryId;
+          allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId && request.resource.data.uploadHistoryId == resource.data.uploadHistoryId;
+          allow delete: if isExistingOwner(userId);
+        }
+      }
+    }
+  }
+}
