@@ -1,5 +1,3 @@
-import { config } from 'dotenv';
-config();
 
 import '@/ai/flows/exam-weaponizer-flow.ts';
 import '@/ai/flows/concept-trap-detector-flow.ts';
