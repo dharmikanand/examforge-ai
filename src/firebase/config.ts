@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyXXXX",
@@ -8,4 +8,4 @@ export const firebaseConfig = {
   messagingSenderId: "543137308160"
 };
 
-export const app = initializeApp(firebaseConfig);
+export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
