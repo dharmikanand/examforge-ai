@@ -1,84 +1,74 @@
-
 'use server';
 /**
- * @fileOverview A Genkit flow for detecting concept traps in study material.
+ * @fileOverview Detects concept traps in study material via OpenRouter (free).
+ * Drop this file at: src/ai/flows/concept-trap-detector-flow.ts
  *
- * - conceptTrapDetector - A function that identifies common mistakes, misconceptions, and trick-based questions.
- * - ConceptTrapDetectorInput - The input type for the conceptTrapDetector function.
- * - ConceptTrapDetectorOutput - The return type for the conceptTrapDetector function.
+ * Exported API is identical to the original — no changes needed elsewhere.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'zod';
+import { callOpenRouterJSON, FREE_MODELS, type OpenRouterMessage } from '@/ai/genkit';
+
+// ─── Input / Output Schemas ───────────────────────────────────────────────────
 
 const ConceptTrapDetectorInputSchema = z.object({
-  studyMaterial: z
-    .string()
-    .describe(
-      'The study material (text content from notes, images, or PDFs) to analyze for concept traps.'
-    ),
+  studyMaterial: z.string(),
 });
-export type ConceptTrapDetectorInput = z.infer<
-  typeof ConceptTrapDetectorInputSchema
->;
+
+export type ConceptTrapDetectorInput = z.infer<typeof ConceptTrapDetectorInputSchema>;
 
 const ConceptTrapDetectorOutputSchema = z.object({
-  commonMistakes:
-    z.array(z.string()).describe('A list of common mistakes related to the study material.'),
-  misconceptions:
-    z.array(z.string()).describe('A list of misconceptions frequently encountered with this topic.'),
-  trickQuestions:
-    z.array(z.string()).describe('A list of trick-based questions or tricky aspects related to the study material.'),
-  frequentlyConfusedConcepts:
-    z.array(z.string()).describe('A list of concepts that are often confused with each other.'),
-  summary:
-    z.string().describe('A brief summary of the overall concept traps identified.'),
+  commonMistakes: z.array(z.string()),
+  misconceptions: z.array(z.string()),
+  trickQuestions: z.array(z.string()),
+  frequentlyConfusedConcepts: z.array(z.string()),
+  summary: z.string(),
 });
-export type ConceptTrapDetectorOutput = z.infer<
-  typeof ConceptTrapDetectorOutputSchema
->;
+
+export type ConceptTrapDetectorOutput = z.infer<typeof ConceptTrapDetectorOutputSchema>;
+
+// ─── System Prompt ────────────────────────────────────────────────────────────
+
+const SYSTEM_PROMPT = `You are an expert educator specializing in competitive exam preparation.
+Analyze the provided study material and identify potential "concept traps".
+
+CRITICAL RULES:
+- Use LaTeX for ALL math: $...$ for inline, $$...$$ for block equations.
+- Subscripts: a_{n}, superscripts: x^{2}, fractions: \\frac{a}{b}, symbols: \\int, \\sum, \\alpha
+- Output ONLY valid JSON — no markdown, no explanation outside JSON.
+
+Identify:
+1. Common Mistakes — errors students frequently make.
+2. Misconceptions — incorrect understandings students often hold.
+3. Trick-Based Questions — ways this concept is tested deceptively.
+4. Frequently Confused Concepts — concepts often mixed up with this one.
+5. Summary — brief overview of all traps identified.
+
+Required JSON structure:
+{
+  "commonMistakes": ["..."],
+  "misconceptions": ["..."],
+  "trickQuestions": ["..."],
+  "frequentlyConfusedConcepts": ["..."],
+  "summary": "..."
+}`;
+
+// ─── Flow ─────────────────────────────────────────────────────────────────────
 
 export async function conceptTrapDetector(
   input: ConceptTrapDetectorInput
 ): Promise<ConceptTrapDetectorOutput> {
-  return conceptTrapDetectorFlow(input);
+  ConceptTrapDetectorInputSchema.parse(input);
+
+  const userMessage: OpenRouterMessage = {
+    role: 'user',
+    content: `Study Material:\n${input.studyMaterial}\n\nIdentify all concept traps in the above material.`,
+  };
+
+  const result = await callOpenRouterJSON<ConceptTrapDetectorOutput>(
+    [{ role: 'system', content: SYSTEM_PROMPT }, userMessage],
+    { models: FREE_MODELS.text, maxTokens: 3000 }
+  );
+
+  return ConceptTrapDetectorOutputSchema.parse(result);
 }
-
-const conceptTrapDetectorPrompt = ai.definePrompt({
-  name: 'conceptTrapDetectorPrompt',
-  input: {schema: ConceptTrapDetectorInputSchema},
-  output: {schema: ConceptTrapDetectorOutputSchema},
-  prompt: `You are an expert educator specializing in competitive exam preparation. Your task is to analyze the provided study material and identify potential "concept traps".
-
-CRITICAL: If the material contains any mathematical content (formulas, equations, variables, derivations), ALWAYS use standard LaTeX notation for ALL mathematical expressions. 
-- Use $...$ for inline math (e.g., $E=mc^2$).
-- Use $$...$$ for standalone block math equations.
-- Ensure subscripts (a_{n}), superscripts (x^{2}), fractions (\frac{a}{b}), and special symbols (\int, \sum, \alpha) are rendered correctly in LaTeX.
-
-Analyze the following study material and output:
-1.  **Common Mistakes**: Errors students frequently make.
-2.  **Misconceptions**: Incorrect understandings students often hold.
-3.  **Trick-Based Questions**: Ways this concept can be tested deceptively.
-4.  **Frequently Confused Concepts**: Other concepts that are often mixed up with this one.
-5.  **Summary**: A brief overview of the identified traps.
-
-Study Material:
-{{{studyMaterial}}}
-
-Please provide your output in a structured JSON format matching the schema provided.`,
-});
-
-const conceptTrapDetectorFlow = ai.defineFlow(
-  {
-    name: 'conceptTrapDetectorFlow',
-    inputSchema: ConceptTrapDetectorInputSchema,
-    outputSchema: ConceptTrapDetectorOutputSchema,
-  },
-  async (input) => {
-    const {output} = await conceptTrapDetectorPrompt(input);
-    if (!output) {
-      throw new Error('Failed to generate concept trap detection output.');
-    }
-    return output;
-  }
-);
