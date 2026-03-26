@@ -12,21 +12,16 @@ const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions";
  * No API key or credits needed for any of these.
  */
 export const FREE_MODELS = {
-  // For text-only flows: reasoning, MCQs, summaries, analysis
+  // Max 3 models allowed by OpenRouter — tried in order, first available wins
   text: [
     "google/gemma-3-27b-it:free",
-    "google/gemma-3-12b-it:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
     "meta-llama/llama-3.1-8b-instruct:free",
     "mistralai/mistral-7b-instruct:free",
-    "qwen/qwen3-8b:free",
-    "deepseek/deepseek-r1-0528:free",
   ],
-  // For flows that include an image input
+  // Vision-capable free models
   vision: [
     "meta-llama/llama-3.2-11b-vision-instruct:free",
     "google/gemma-3-27b-it:free",
-    "google/gemma-3-12b-it:free",
     "qwen/qwen2.5-vl-7b-instruct:free",
   ],
 } as const;
